@@ -23,7 +23,42 @@ except Exception:
     initialize_agent = None
     _HAS_INITIALIZE = False
 
-from langchain.memory import ConversationBufferMemory
+try:
+    # Some LangChain releases moved memory helpers; try import first
+    from langchain.memory import ConversationBufferMemory  # type: ignore
+    _HAS_MEMORY = True
+except Exception:
+    ConversationBufferMemory = None
+    _HAS_MEMORY = False
+
+# Lightweight fallback memory implementation when langchain.memory is unavailable
+if not _HAS_MEMORY:
+    class ConversationBufferMemory:
+        """Minimal replacement for LangChain's ConversationBufferMemory.
+
+        This provides the small surface area used by the app: construction
+        with `memory_key` and `return_messages`, saving context, and
+        loading memory variables. It intentionally keeps behavior simple so
+        the app remains runnable in environments with different LangChain
+        versions.
+        """
+        def __init__(self, memory_key: str = "chat_history", return_messages: bool = True):
+            self.memory_key = memory_key
+            self.return_messages = return_messages
+            self.buffer = []
+
+        def load_memory_variables(self, inputs=None):
+            return {self.memory_key: self.buffer}
+
+        def save_context(self, inputs, outputs):
+            try:
+                # store a compact record
+                self.buffer.append({"input": inputs, "output": outputs})
+            except Exception:
+                pass
+
+        def clear(self):
+            self.buffer = []
 from langchain_openai import ChatOpenAI
 from langchain.tools import Tool
 from typing import List, Dict, Any
