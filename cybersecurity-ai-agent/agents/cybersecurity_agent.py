@@ -1,7 +1,8 @@
-from langchain.agents import initialize_agent
+from langchain.agents import create_react_agent, AgentExecutor
 from langchain.memory import ConversationBufferMemory
 from langchain_openai import ChatOpenAI
 from langchain.tools import Tool
+from langchain import hub
 from typing import List, Dict, Any
 import json
 import os
@@ -220,14 +221,24 @@ if result['feedback']:
         - Risk assessments and mitigation strategies
         """
         
-        return initialize_agent(
-            tools=self.tools,
+        # Use modern LangChain API (0.1.0+)
+        prompt = hub.pull("hwchase17/react-chat")
+        
+        agent = create_react_agent(
             llm=self.llm,
-            agent="conversational-react-description",
+            tools=self.tools,
+            prompt=prompt
+        )
+        
+        agent_executor = AgentExecutor(
+            agent=agent,
+            tools=self.tools,
             memory=self.memory,
             verbose=True,
-            agent_kwargs={"system_message": system_prompt}
+            handle_parsing_errors=True
         )
+        
+        return agent_executor
     
     def _analyze_threat(self, threat_description: str) -> str:
         """Analyze threat and provide mitigation strategies"""
