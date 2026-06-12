@@ -1,8 +1,31 @@
-from langchain.agents import create_react_agent, AgentExecutor
+"""
+Compatibility imports for different LangChain versions.
+This module will try several import styles and fall back to a safe stub
+agent when the LangChain agent helpers are not available (prevents
+import errors on platforms with different LangChain releases).
+"""
+try:
+    # Newer LangChain (0.1.0+): try react-style helpers
+    from langchain.agents import create_react_agent, AgentExecutor  # type: ignore
+    from langchain import hub  # type: ignore
+    _HAS_CREATE_REACT = True
+except Exception:
+    create_react_agent = None
+    AgentExecutor = None
+    hub = None
+    _HAS_CREATE_REACT = False
+
+try:
+    # Older LangChain: initialize_agent was provided previously
+    from langchain.agents import initialize_agent  # type: ignore
+    _HAS_INITIALIZE = True
+except Exception:
+    initialize_agent = None
+    _HAS_INITIALIZE = False
+
 from langchain.memory import ConversationBufferMemory
 from langchain_openai import ChatOpenAI
 from langchain.tools import Tool
-from langchain import hub
 from typing import List, Dict, Any
 import json
 import os
@@ -221,24 +244,59 @@ if result['feedback']:
         - Risk assessments and mitigation strategies
         """
         
-        # Use modern LangChain API (0.1.0+)
-        prompt = hub.pull("hwchase17/react-chat")
-        
-        agent = create_react_agent(
-            llm=self.llm,
-            tools=self.tools,
-            prompt=prompt
-        )
-        
-        agent_executor = AgentExecutor(
-            agent=agent,
-            tools=self.tools,
-            memory=self.memory,
-            verbose=True,
-            handle_parsing_errors=True
-        )
-        
-        return agent_executor
+        # Prefer older 'initialize_agent' if available (legacy code paths)
+        if _HAS_INITIALIZE and initialize_agent is not None:
+            return initialize_agent(
+                tools=self.tools,
+                llm=self.llm,
+                agent="conversational-react-description",
+                memory=self.memory,
+                verbose=True,
+                agent_kwargs={"system_message": system_prompt}
+            )
+
+        # Try newer react-style agent if available
+        if _HAS_CREATE_REACT and create_react_agent is not None and hub is not None:
+            try:
+                prompt = hub.pull("hwchase17/react-chat")
+                agent = create_react_agent(
+                    llm=self.llm,
+                    tools=self.tools,
+                    prompt=prompt
+                )
+                agent_executor = AgentExecutor(
+                    agent=agent,
+                    tools=self.tools,
+                    memory=self.memory,
+                    verbose=True,
+                    handle_parsing_errors=True,
+                )
+                return agent_executor
+            except Exception:
+                # fall through to safe stub
+                pass
+
+        # Fallback: provide a safe stub agent to avoid import/runtime errors
+        class _SafeAgentStub:
+            """Minimal agent stub that keeps the app running when LangChain
+            agent helpers are not present. This stub returns an informative
+            message and does not attempt to call tools.
+            """
+            def __init__(self, llm, tools, memory, system_prompt):
+                self.llm = llm
+                self.tools = tools
+                self.memory = memory
+                self.system_prompt = system_prompt
+
+            def run(self, input_text: str) -> str:
+                return (
+                    "Agent functionality is unavailable in this environment. "
+                    "To enable full agent behavior, install a compatible "
+                    "version of LangChain or update the app. "
+                    "(Example: pin an older LangChain release in requirements.)"
+                )
+
+        return _SafeAgentStub(self.llm, self.tools, self.memory, system_prompt)
     
     def _analyze_threat(self, threat_description: str) -> str:
         """Analyze threat and provide mitigation strategies"""
