@@ -1,4 +1,4 @@
-from langchain.agents import AgentType, initialize_agent
+from langchain.agents import initialize_agent
 from langchain.memory import ConversationBufferMemory
 from langchain_openai import ChatOpenAI
 from langchain.tools import Tool
@@ -223,7 +223,7 @@ if result['feedback']:
         return initialize_agent(
             tools=self.tools,
             llm=self.llm,
-            agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+            agent="conversational-react-description",
             memory=self.memory,
             verbose=True,
             agent_kwargs={"system_message": system_prompt}
