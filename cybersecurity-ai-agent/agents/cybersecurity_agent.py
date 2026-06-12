@@ -1,23 +1,4 @@
-"""
-Compatibility imports for different LangChain versions.
-
-Some Streamlit deployments install a newer LangChain where `AgentType`
-may not be exported from `langchain.agents`. We try the old import
-first, and fall back to a string agent identifier when necessary.
-"""
-try:
-    from langchain.agents import AgentType, initialize_agent
-    AGENT_TYPE_CONVERSATIONAL = AgentType.CONVERSATIONAL_REACT_DESCRIPTION
-except Exception:
-    # Fallback: newer langchain releases may not expose AgentType; use
-    # the string identifier that `initialize_agent` accepts instead.
-    try:
-        from langchain.agents import initialize_agent
-    except Exception:
-        # Let the original ImportError surface later if initialize_agent is missing
-        raise
-    AGENT_TYPE_CONVERSATIONAL = "conversational-react-description"
-
+from langchain.agents import AgentType, initialize_agent
 from langchain.memory import ConversationBufferMemory
 from langchain_openai import ChatOpenAI
 from langchain.tools import Tool
@@ -242,7 +223,7 @@ if result['feedback']:
         return initialize_agent(
             tools=self.tools,
             llm=self.llm,
-            agent=AGENT_TYPE_CONVERSATIONAL,
+            agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
             memory=self.memory,
             verbose=True,
             agent_kwargs={"system_message": system_prompt}
